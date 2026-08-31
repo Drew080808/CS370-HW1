@@ -1,0 +1,19 @@
+# C build artifacts
+*.o
+*.out
+*.d
+build/
+vgcore.*
+*.dSYM/
+
+# Compiled test binaries
+tests/test_rbtree
+tests/fuzz
+
+# Compilation database
+compile_commands.json
+
+# Editor temporary files
+*~
+*.swp
+*.swo
