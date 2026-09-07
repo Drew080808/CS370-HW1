@@ -170,6 +170,55 @@ static void test_insert_ascending_run_findable(void) {
     rb_destroy(t);
 }
 
+/* insert_fixup has three shapes for the "uncle is black" case: a straight
+ * outer rotation (LL/RR, already covered by the ascending run above) and
+ * two inner zigzag double-rotations (LR, RL). These sequences are traced
+ * by hand to land in each remaining branch of src/rbtree.c:94-136. */
+static void test_insert_triggers_left_left_rotation(void) {
+    rbtree_t *t = rb_create(NULL);
+    assert(t != NULL);
+    const char *keys[] = {"c", "b", "a"};
+    int values[3];
+
+    for (size_t i = 0; i < 3; i++) {
+        values[i] = (int)i;
+        assert(rb_insert(t, keys[i], &values[i]) == 0);
+        assert(rb_validate(t) == 0);
+    }
+    assert(rb_size(t) == 3);
+    rb_destroy(t);
+}
+
+static void test_insert_triggers_left_right_zigzag(void) {
+    rbtree_t *t = rb_create(NULL);
+    assert(t != NULL);
+    const char *keys[] = {"c", "a", "b"};
+    int values[3];
+
+    for (size_t i = 0; i < 3; i++) {
+        values[i] = (int)i;
+        assert(rb_insert(t, keys[i], &values[i]) == 0);
+        assert(rb_validate(t) == 0);
+    }
+    assert(rb_size(t) == 3);
+    rb_destroy(t);
+}
+
+static void test_insert_triggers_right_left_zigzag(void) {
+    rbtree_t *t = rb_create(NULL);
+    assert(t != NULL);
+    const char *keys[] = {"a", "c", "b"};
+    int values[3];
+
+    for (size_t i = 0; i < 3; i++) {
+        values[i] = (int)i;
+        assert(rb_insert(t, keys[i], &values[i]) == 0);
+        assert(rb_validate(t) == 0);
+    }
+    assert(rb_size(t) == 3);
+    rb_destroy(t);
+}
+
 static void test_validate_empty_tree(void) {
     rbtree_t *t = rb_create(NULL);
     assert(t != NULL);
@@ -199,6 +248,9 @@ int main(void) {
     test_insert_foreach_sorted_order();
     test_insert_overwrite_frees_old_value();
     test_insert_ascending_run_findable();
+    test_insert_triggers_left_left_rotation();
+    test_insert_triggers_left_right_zigzag();
+    test_insert_triggers_right_left_zigzag();
     test_validate_empty_tree();
     test_validate_single_node();
     printf("all tests passed\n");
