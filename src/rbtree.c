@@ -187,9 +187,14 @@ int rb_insert(rbtree_t *t, const char *key, void *value) {
 }
 
 void *rb_find(const rbtree_t *t, const char *key) {
-    (void)t;
-    (void)key;
-    /* TODO(M1): BST search by strcmp order. */
+    rb_node_t *cur = t->root;
+    while (cur != NULL) {
+        int cmp = strcmp(key, cur->key);
+        if (cmp == 0) {
+            return cur->value;
+        }
+        cur = (cmp < 0) ? cur->left : cur->right;
+    }
     return NULL;
 }
 
