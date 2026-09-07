@@ -13,6 +13,15 @@ this file is the operative subset. If something isn't covered here, ask before a
 - A change is DONE only when all three pass. Always actually run them and show real output —
   never assert something passes without running it.
 
+## Toolchain
+This machine's default `gcc` is 11.5.0, which doesn't support `-std=c23` (needs gcc 14+) —
+do not "fix" this by changing the Makefile's `-std=c23`, since that flag is a hard requirement
+from the assignment spec. Instead run `module load gcc/15.2.0` (also available: `gcc/16.1.0`)
+before `make`/`make test`/`make asan`/`make memcheck`. `module load` is session-scoped — it
+only affects the current shell and must be re-run in every new terminal/session; it does not
+persist across sessions or get inherited by subshells started later. (Same gap was already hit
+and resolved this way on `../HW0`.)
+
 ## Hard constraints
 - NEVER modify `include/rbtree.h`. It is the frozen, graded contract.
 - Check every `malloc` return. A NULL return must leave the tree unchanged and return the
