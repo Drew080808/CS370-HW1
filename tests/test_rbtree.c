@@ -83,6 +83,7 @@ static void test_insert_multiple_findable(void) {
     for (size_t i = 0; i < n; i++) {
         values[i] = (int)i;
         assert(rb_insert(t, keys[i], &values[i]) == 0);
+        assert(rb_validate(t) == 0);
     }
     assert(rb_size(t) == n);
     for (size_t i = 0; i < n; i++) {
@@ -145,6 +146,7 @@ static void test_insert_overwrite_frees_old_value(void) {
     assert(new_value.freed == 0);
     assert(rb_size(t) == 1);
     assert(rb_find(t, "dup") == &new_value);
+    assert(rb_validate(t) == 0);
     rb_destroy(t);
 }
 
@@ -159,11 +161,28 @@ static void test_insert_ascending_run_findable(void) {
         keys[i][1] = '\0';
         values[i] = i;
         assert(rb_insert(t, keys[i], &values[i]) == 0);
+        assert(rb_validate(t) == 0);
     }
     assert(rb_size(t) == 26);
     for (int i = 0; i < 26; i++) {
         assert(rb_find(t, keys[i]) == &values[i]);
     }
+    rb_destroy(t);
+}
+
+static void test_validate_empty_tree(void) {
+    rbtree_t *t = rb_create(NULL);
+    assert(t != NULL);
+    assert(rb_validate(t) == 0);
+    rb_destroy(t);
+}
+
+static void test_validate_single_node(void) {
+    rbtree_t *t = rb_create(NULL);
+    assert(t != NULL);
+    int value = 1;
+    assert(rb_insert(t, "root", &value) == 0);
+    assert(rb_validate(t) == 0);
     rb_destroy(t);
 }
 
@@ -180,6 +199,8 @@ int main(void) {
     test_insert_foreach_sorted_order();
     test_insert_overwrite_frees_old_value();
     test_insert_ascending_run_findable();
+    test_validate_empty_tree();
+    test_validate_single_node();
     printf("all tests passed\n");
     return 0;
 }

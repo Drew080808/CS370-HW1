@@ -226,9 +226,65 @@ void rb_foreach(const rbtree_t *t,
     foreach_subtree(t->root, fn, ctx);
 }
 
+/* Returns the black-height of node's subtree (NIL counts as black height
+ * 0), or -1 if a red node has a red child or the two subtrees disagree on
+ * black-height. */
+static int check_black_height(const rb_node_t *node) {
+    if (node == NULL) {
+        return 0;
+    }
+    if (node->color == RB_RED &&
+        (node_color(node->left) == RB_RED || node_color(node->right) == RB_RED)) {
+        return -1;
+    }
+    int left_bh = check_black_height(node->left);
+    if (left_bh < 0) {
+        return -1;
+    }
+    int right_bh = check_black_height(node->right);
+    if (right_bh < 0 || left_bh != right_bh) {
+        return -1;
+    }
+    return left_bh + (node->color == RB_BLACK ? 1 : 0);
+}
+
+/* In-order walk checking strict increase under strcmp. *last tracks the
+ * most recently visited key (NULL before the first). */
+static int check_strictly_increasing(const rb_node_t *node, const char **last) {
+    if (node == NULL) {
+        return 1;
+    }
+    if (!check_strictly_increasing(node->left, last)) {
+        return 0;
+    }
+    if (*last != NULL && strcmp(*last, node->key) >= 0) {
+        return 0;
+    }
+    *last = node->key;
+    return check_strictly_increasing(node->right, last);
+}
+
+static size_t count_subtree(const rb_node_t *node) {
+    if (node == NULL) {
+        return 0;
+    }
+    return 1 + count_subtree(node->left) + count_subtree(node->right);
+}
+
 int rb_validate(const rbtree_t *t) {
-    (void)t;
-    /* TODO(M1): check the red-black invariants listed in rbtree.h. */
+    if (node_color(t->root) != RB_BLACK) {
+        return -1;
+    }
+    if (check_black_height(t->root) < 0) {
+        return -1;
+    }
+    const char *last = NULL;
+    if (!check_strictly_increasing(t->root, &last)) {
+        return -1;
+    }
+    if (count_subtree(t->root) != t->size) {
+        return -1;
+    }
     return 0;
 }
 
