@@ -198,11 +198,96 @@ void *rb_find(const rbtree_t *t, const char *key) {
     return NULL;
 }
 
-int rb_delete(rbtree_t *t, const char *key) {
+/* Leftmost node of a subtree; used to find the in-order successor when the
+ * node being deleted has two children. */
+static rb_node_t *subtree_min(rb_node_t *n) {
+    while (n->left != NULL) {
+        n = n->left;
+    }
+    return n;
+}
+
+/* Replaces the subtree rooted at u with the subtree rooted at v (v may be
+ * NULL). Guards v == NULL since NIL has no node object here to carry a
+ * parent pointer -- callers that need it track v's new parent separately. */
+static void transplant(rbtree_t *t, rb_node_t *u, rb_node_t *v) {
+    if (u->parent == NULL) {
+        t->root = v;
+    } else if (u == u->parent->left) {
+        u->parent->left = v;
+    } else {
+        u->parent->right = v;
+    }
+    if (v != NULL) {
+        v->parent = u->parent;
+    }
+}
+
+/* x is the node that moved into the spliced-out position (may be NULL);
+ * x_parent is threaded through explicitly since x may be NULL and can't
+ * carry its own parent pointer. */
+static void delete_fixup(rbtree_t *t, rb_node_t *x, rb_node_t *x_parent) {
     (void)t;
-    (void)key;
-    /* TODO(M2): delete + fixup. */
-    return -1;
+    (void)x;
+    (void)x_parent;
+    /* TODO(M2 slice 2+): rebalance. */
+}
+
+int rb_delete(rbtree_t *t, const char *key) {
+    rb_node_t *z = t->root;
+    while (z != NULL) {
+        int cmp = strcmp(key, z->key);
+        if (cmp == 0) {
+            break;
+        }
+        z = (cmp < 0) ? z->left : z->right;
+    }
+    if (z == NULL) {
+        return -1;
+    }
+
+    rb_node_t *y = z;
+    rb_color_t y_original_color = y->color;
+    rb_node_t *x;
+    rb_node_t *x_parent;
+
+    if (z->left == NULL) {
+        x = z->right;
+        x_parent = z->parent;
+        transplant(t, z, z->right);
+    } else if (z->right == NULL) {
+        x = z->left;
+        x_parent = z->parent;
+        transplant(t, z, z->left);
+    } else {
+        y = subtree_min(z->right);
+        y_original_color = y->color;
+        x = y->right;
+        if (y->parent == z) {
+            x_parent = y;
+        } else {
+            x_parent = y->parent;
+            transplant(t, y, y->right);
+            y->right = z->right;
+            y->right->parent = y;
+        }
+        transplant(t, z, y);
+        y->left = z->left;
+        y->left->parent = y;
+        y->color = z->color;
+    }
+
+    rb_free(z->key);
+    if (t->value_free != NULL) {
+        t->value_free(z->value);
+    }
+    rb_free(z);
+    t->size--;
+
+    if (y_original_color == RB_BLACK) {
+        delete_fixup(t, x, x_parent);
+    }
+    return 0;
 }
 
 size_t rb_size(const rbtree_t *t) {

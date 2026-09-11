@@ -243,6 +243,94 @@ static void test_validate_single_node(void) {
     rb_destroy(t);
 }
 
+/* Delete slice 1 covers only the BST-splice orchestration; delete_fixup is
+ * still a no-op stub (see src/rbtree.c and PROMPTLOG.md), so only cases
+ * where y_original_color ends up RED -- or the tree ends up empty -- can
+ * pass rb_validate this slice. Cases needing real fixup (black leaf with a
+ * red sibling, black node with exactly one red child) are deferred. */
+
+static void test_delete_absent_key(void) {
+    rbtree_t *t = create_test_tree(NULL);
+    int value = 1;
+    int rc = rb_insert(t, "present", &value);
+    assert(rc == 0);
+    assert(rb_delete(t, "missing") == -1);
+    assert(rb_size(t) == 1);
+    assert(rb_validate(t) == 0);
+    rb_destroy(t);
+}
+
+static void test_delete_red_leaf(void) {
+    rbtree_t *t = create_test_tree(NULL);
+    int values[3];
+    const char *keys[] = {"c", "b", "a"};
+    for (size_t i = 0; i < 3; i++) {
+        values[i] = (int)i;
+        assert(rb_insert(t, keys[i], &values[i]) == 0);
+    }
+    /* c(B) root, b(B) left, a(R) left-left leaf -- delete the red leaf. */
+    assert(rb_validate(t) == 0);
+    assert(rb_delete(t, "a") == 0);
+    assert(rb_size(t) == 2);
+    assert(rb_find(t, "a") == NULL);
+    assert(rb_validate(t) == 0);
+    rb_destroy(t);
+}
+
+static void test_delete_sole_node(void) {
+    rbtree_t *t = create_test_tree(NULL);
+    int value = 1;
+    assert(rb_insert(t, "only", &value) == 0);
+    assert(rb_delete(t, "only") == 0);
+    assert(rb_size(t) == 0);
+    assert(rb_find(t, "only") == NULL);
+    assert(rb_validate(t) == 0);
+    rb_destroy(t);
+}
+
+static void test_delete_root_two_children_fixup_free(void) {
+    rbtree_t *t = create_test_tree(NULL);
+    int values[3];
+    const char *keys[] = {"d", "b", "f"};
+    for (size_t i = 0; i < 3; i++) {
+        values[i] = (int)i;
+        assert(rb_insert(t, keys[i], &values[i]) == 0);
+    }
+    /* d(B) root, b(R) left leaf, f(R) right leaf. Successor of "d" is "f"
+     * (z's direct right child, a red leaf) -- fixup-free. */
+    assert(rb_validate(t) == 0);
+    assert(rb_delete(t, "d") == 0);
+    assert(rb_size(t) == 2);
+    assert(rb_find(t, "d") == NULL);
+    assert(rb_find(t, "b") == &values[1]);
+    assert(rb_find(t, "f") == &values[2]);
+    assert(rb_validate(t) == 0);
+    rb_destroy(t);
+}
+
+static void test_delete_two_children_deep_successor_fixup_free(void) {
+    rbtree_t *t = create_test_tree(NULL);
+    int values[4];
+    const char *keys[] = {"d", "f", "b", "e"};
+    for (size_t i = 0; i < 4; i++) {
+        values[i] = (int)i;
+        assert(rb_insert(t, keys[i], &values[i]) == 0);
+    }
+    /* d(B) root, b(B) left leaf, f(B) right with f->left = e(R) leaf.
+     * Successor of "d" is "e" -- not z's direct child (y->parent != z),
+     * exercising the deeper-successor splice sub-branch. "e" is a red
+     * leaf, so this stays fixup-free. */
+    assert(rb_validate(t) == 0);
+    assert(rb_delete(t, "d") == 0);
+    assert(rb_size(t) == 3);
+    assert(rb_find(t, "d") == NULL);
+    assert(rb_find(t, "b") == &values[2]);
+    assert(rb_find(t, "f") == &values[1]);
+    assert(rb_find(t, "e") == &values[3]);
+    assert(rb_validate(t) == 0);
+    rb_destroy(t);
+}
+
 int main(void) {
     test_size_empty_tree();
     test_destroy_null_is_safe();
@@ -261,6 +349,11 @@ int main(void) {
     test_insert_triggers_right_left_zigzag();
     test_validate_empty_tree();
     test_validate_single_node();
+    test_delete_absent_key();
+    test_delete_red_leaf();
+    test_delete_sole_node();
+    test_delete_root_two_children_fixup_free();
+    test_delete_two_children_deep_successor_fixup_free();
     printf("all tests passed\n");
     return 0;
 }
