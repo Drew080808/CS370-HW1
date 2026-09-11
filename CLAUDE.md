@@ -67,6 +67,14 @@ Fuzzer must run ≥10^5 random insert/find/delete ops against a reference model,
   overwrite path, unchecked allocations, and subtrees `rb_destroy` might miss.
 - Commit only from a green state (all three commands above pass); message format `M<n>: <what>`.
   Need ≥8 meaningful commits total for the assignment — no single "final submission" commit.
+- `git push origin main` immediately after every commit — no batching. Commit author/committer
+  dates are self-reported by the local machine and prove nothing on their own; what's actually
+  hard to fake is GitHub's server-side timestamp for when it *received* a push. A local commit
+  history with no matching push history is not evidence the work happened over multiple days —
+  only a matching trail of individual push events on GitHub is. (History lesson: two prior
+  pushes on this repo were batched — Aug 31 and Sep 7 — leaving 7 commits sitting local-only
+  with zero GitHub-side timestamp until they were all pushed together in one shot. Don't repeat
+  that gap.)
 - New milestone → new session (`/clear`). Use `/compact` mid-task if a debugging thread gets
   noisy, keeping the failing test output and current diff.
 
