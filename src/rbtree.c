@@ -227,10 +227,62 @@ static void transplant(rbtree_t *t, rb_node_t *u, rb_node_t *v) {
  * x_parent is threaded through explicitly since x may be NULL and can't
  * carry its own parent pointer. */
 static void delete_fixup(rbtree_t *t, rb_node_t *x, rb_node_t *x_parent) {
-    (void)t;
-    (void)x;
-    (void)x_parent;
-    /* TODO(M2 slice 2+): rebalance. */
+    while (x != t->root && node_color(x) == RB_BLACK) {
+        if (x == x_parent->left) {
+            rb_node_t *w = x_parent->right;
+            if (node_color(w) == RB_RED) {
+                w->color = RB_BLACK;
+                x_parent->color = RB_RED;
+                rotate_left(t, x_parent);
+                w = x_parent->right;
+            }
+            if (node_color(w->left) == RB_BLACK && node_color(w->right) == RB_BLACK) {
+                w->color = RB_RED;
+                x = x_parent;
+                x_parent = x->parent;
+            } else {
+                if (node_color(w->right) == RB_BLACK) {
+                    w->left->color = RB_BLACK;
+                    w->color = RB_RED;
+                    rotate_right(t, w);
+                    w = x_parent->right;
+                }
+                w->color = x_parent->color;
+                x_parent->color = RB_BLACK;
+                w->right->color = RB_BLACK;
+                rotate_left(t, x_parent);
+                x = t->root;
+            }
+        } else {
+            rb_node_t *w = x_parent->left;
+            if (node_color(w) == RB_RED) {
+                w->color = RB_BLACK;
+                x_parent->color = RB_RED;
+                rotate_right(t, x_parent);
+                w = x_parent->left;
+            }
+            if (node_color(w->right) == RB_BLACK && node_color(w->left) == RB_BLACK) {
+                w->color = RB_RED;
+                x = x_parent;
+                x_parent = x->parent;
+            } else {
+                if (node_color(w->left) == RB_BLACK) {
+                    w->right->color = RB_BLACK;
+                    w->color = RB_RED;
+                    rotate_left(t, w);
+                    w = x_parent->left;
+                }
+                w->color = x_parent->color;
+                x_parent->color = RB_BLACK;
+                w->left->color = RB_BLACK;
+                rotate_right(t, x_parent);
+                x = t->root;
+            }
+        }
+    }
+    if (x != NULL) {
+        x->color = RB_BLACK;
+    }
 }
 
 int rb_delete(rbtree_t *t, const char *key) {
