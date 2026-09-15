@@ -5,9 +5,11 @@
 /* White-box tests: pull in rbtree.c's internals (rb_node_t, rbtree_t,
  * RB_RED/RB_BLACK, rb_malloc) directly so hand-built, deliberately invalid
  * trees can be fed to rb_validate. The public API (include/rbtree.h) never
- * produces an invalid tree on its own -- rb_insert's fixup always leaves a
- * correct tree, and rb_delete isn't implemented yet -- so there is no way
- * to reach these cases through the frozen header alone. */
+ * produces an invalid tree on its own -- rb_insert's and rb_delete's fixups
+ * always leave a correct tree -- so there is no way to reach these cases
+ * through the frozen header alone. Hand-built trees also let delete tests
+ * hit a specific delete_fixup branch deterministically instead of hoping a
+ * sequence of public-API calls lands on it. */
 #include "../src/rbtree.c"
 
 static rb_node_t *make_node(const char *key, rb_color_t color) {
@@ -100,6 +102,32 @@ static void test_validate_accepts_hand_built_valid_tree(void) {
     rb_destroy(t);
 }
 
+static void test_delete_two_children_root_triggers_fixup(void) {
+    rb_node_t *b = make_node("b", RB_BLACK);
+    rb_node_t *f = make_node("f", RB_BLACK);
+    rb_node_t *d = make_node("d", RB_BLACK);
+    d->left = b;
+    b->parent = d;
+    d->right = f;
+    f->parent = d;
+    rbtree_t *t = make_tree(d, 3);
+    assert(rb_validate(t) == 0);
+
+    /* Successor of "d" is "f" (z's direct right child, itself black), so
+     * y_original_color is BLACK and delete_fixup actually runs: case 2
+     * fires on x_parent=f/w=b (both of b's children are NIL/black), which
+     * should recolor b red and leave f as the new black root. */
+    assert(rb_delete(t, "d") == 0);
+    assert(rb_size(t) == 2);
+    assert(rb_validate(t) == 0);
+    assert(strcmp(t->root->key, "f") == 0);
+    assert(t->root->color == RB_BLACK);
+    assert(t->root->left != NULL && strcmp(t->root->left->key, "b") == 0);
+    assert(t->root->left->color == RB_RED);
+    assert(t->root->right == NULL);
+    rb_destroy(t);
+}
+
 int main(void) {
     test_validate_rejects_red_root();
     test_validate_rejects_red_red_violation();
@@ -107,6 +135,7 @@ int main(void) {
     test_validate_rejects_out_of_order_keys();
     test_validate_rejects_size_mismatch();
     test_validate_accepts_hand_built_valid_tree();
+    test_delete_two_children_root_triggers_fixup();
     printf("all whitebox tests passed\n");
     return 0;
 }

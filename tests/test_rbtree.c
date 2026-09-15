@@ -243,11 +243,9 @@ static void test_validate_single_node(void) {
     rb_destroy(t);
 }
 
-/* Delete slice 1 covers only the BST-splice orchestration; delete_fixup is
- * still a no-op stub (see src/rbtree.c and PROMPTLOG.md), so only cases
- * where y_original_color ends up RED -- or the tree ends up empty -- can
- * pass rb_validate this slice. Cases needing real fixup (black leaf with a
- * red sibling, black node with exactly one red child) are deferred. */
+/* Delete slice 1 covered only the BST-splice orchestration. delete_fixup is
+ * now implemented (see src/rbtree.c); the cases below exercise real
+ * rebalancing on top of that, in addition to the earlier fixup-free cases. */
 
 static void test_delete_absent_key(void) {
     rbtree_t *t = create_test_tree(NULL);
@@ -331,6 +329,26 @@ static void test_delete_two_children_deep_successor_fixup_free(void) {
     rb_destroy(t);
 }
 
+static void test_delete_black_node_one_red_child(void) {
+    rbtree_t *t = create_test_tree(NULL);
+    int values[2];
+    const char *keys[] = {"b", "a"};
+    for (size_t i = 0; i < 2; i++) {
+        values[i] = (int)i;
+        assert(rb_insert(t, keys[i], &values[i]) == 0);
+    }
+    /* b(B) root, a(R) left leaf. Deleting "b" (black, one red child)
+     * promotes "a" into the root slot -- rb_validate's "root must be
+     * black" check fails here unless delete_fixup actually recolors it. */
+    assert(rb_validate(t) == 0);
+    assert(rb_delete(t, "b") == 0);
+    assert(rb_size(t) == 1);
+    assert(rb_find(t, "b") == NULL);
+    assert(rb_find(t, "a") == &values[1]);
+    assert(rb_validate(t) == 0);
+    rb_destroy(t);
+}
+
 int main(void) {
     test_size_empty_tree();
     test_destroy_null_is_safe();
@@ -354,6 +372,7 @@ int main(void) {
     test_delete_sole_node();
     test_delete_root_two_children_fixup_free();
     test_delete_two_children_deep_successor_fixup_free();
+    test_delete_black_node_one_red_child();
     printf("all tests passed\n");
     return 0;
 }
