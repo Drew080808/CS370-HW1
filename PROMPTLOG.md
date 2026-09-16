@@ -1,14 +1,5 @@
 # PROMPTLOG
 
-## Episode: fuzzer sequencing question (pre-M2)
-**Context:** Before starting the M2 delete-logic plan, asked the agent for a status summary (what's implemented vs. not) to confirm M1 was actually done and there was no unfinished business blocking delete work.
-
-**Question asked:** Is it standard practice to write fuzzers last, since they won't have anything to fuzz until the API is more complete?
-
-**What came back:** Not "last" specifically — fuzzing earns its keep once there's a mutating surface with nontrivial interactions (insert + delete + find together), since a fuzzer over insert-only mostly duplicates the `rb_validate` assertions already run after every insert in the unit tests. Delete is the highest-risk code (fixup cases, frees), so pairing the fuzzer with M2 concentrates fuzzing effort where it actually catches bugs unit tests won't think to construct.
-
-**My judgment call:** Agreed — keeping the fuzzer stubbed through M1 and building it out alongside delete (per the existing CLAUDE.md milestone split) rather than front-loading a partial insert/find-only fuzzer.
-
 ## Episode: scoping the delete_fixup session too large (rejected diff)
 **Context:** Asked the agent to plan out getting deletion (`delete_fixup`, currently a no-op stub in src/rbtree.c) working in one session, with at least two commits since it's a large enough task to warrant it. The agent planned in plan mode and got the plan approved: implement `delete_fixup` fully, then add ~8 new table-driven/whitebox tests covering every fixup case (1-4, a mirror, a cascade) plus the required minimum cases, split across two commits.
 
@@ -25,8 +16,33 @@
 
 **My judgment call:** Agreed with the structural-assertion approach; had the agent write the test using `t->root->key`/`->left->color`/`->right == NULL` assertions instead of `rb_find`, with no change to `make_node`'s signature.
 
+## Episode: plan revised mid-execution -- wrong assumption about mirror-branch coverage
+**Context:** Partway through executing the approved M2 test-coverage plan (Case 3, Case 4, and
+a mirror-branch test), the plan's step 4 called for a "Case 2 mirror" test, on the assumption
+that the mirror/right-child branch of `delete_fixup` was entirely untested.
+
+**What came back:** Before writing anything, the agent traced the already-committed
+`test_delete_two_children_root_triggers_fixup` test and found the assumption was wrong -- that
+test already incidentally exercised the mirror branch's Case 2, because after the transplant,
+`x_parent->left` was non-NULL, routing execution into the `else` (mirror) branch. It flagged
+this to me directly, explained the trace, and proposed substituting a Case 4 mirror test
+instead of the originally planned Case 2 mirror.
+
+**My judgment call:** Accepted the revision without objection -- the trace was correct and a
+Case 2 mirror test would've been redundant. Approving a plan's *shape* (add cases X, Y, mirror)
+doesn't freeze its specific contents once execution surfaces new information about what's
+already covered; a plan revision here was the right call over blindly executing the original.
+
 ## Episode: finishing M2 test coverage -- delete_fixup cases, mirrors, and the fuzzer
-**Context:** Asked the agent to finish up deletion tests. It explored the repo first (an uncommitted whitebox test was sitting in the working tree, and only Case 2 plus a Case 1-to-2 cascade had coverage), then proposed a plan: verify/commit the pending test, then add Case 3, Case 4, and at least one mirror-branch test, one at a time with each tree/trace proposed and approved before writing -- consistent with the "tests one at a time, shown before writing" rule from the earlier delete_fixup episode above. I approved the plan and each individual test proposal (Case 1-to-2 cascade commit, Case 3-to-4 cascade, Case 4 direct, Case 4 mirror, Case 1 mirror cascade, Case 3 mirror cascade), each landing as its own commit+push. Partway through, the agent flagged that its own plan's assumption was wrong: it had assumed the mirror branch of `delete_fixup` was entirely untested and planned a "Case 2 mirror" test, but tracing the already-committed `test_delete_two_children_root_triggers_fixup` showed it actually already exercised the mirror branch's Case 2 incidentally. The agent caught this itself before writing anything and substituted a Case 4 mirror test instead, explaining the correction before asking for approval.
+**Context:** Asked the agent to finish up deletion tests. It explored the repo first (an
+uncommitted whitebox test was sitting in the working tree, and only Case 2 plus a Case 1-to-2
+cascade had coverage), then proposed a plan: verify/commit the pending test, then add Case 3,
+Case 4, and at least one mirror-branch test, one at a time with each tree/trace proposed and
+approved before writing -- consistent with the "tests one at a time, shown before writing" rule
+from the earlier delete_fixup episode above. I approved the plan and each individual test
+proposal (Case 1-to-2 cascade commit, Case 3-to-4 cascade, Case 4 direct, Case 4 mirror, Case 1
+mirror cascade, Case 3 mirror cascade), each landing as its own commit+push. (See the separate
+"plan revised mid-execution" episode above for a wrong assumption caught partway through.)
 
 **Question asked (fuzzer design):** After all eight fixup-case/mirror tests landed, asked the agent to design `tests/fuzz.c` (still a stub) next: a bounded 500-key reference model, insert/find/delete chosen 1/3 each, `rb_size` checked every op, `rb_validate` on a periodic cadence, fixed default seed for reproducibility. Reviewed the full proposed file before it was written (per the same show-before-writing rule) and caught an off-by-one: `if (i % VALIDATE_EVERY == 0)` validates after ops 1, 101, 201, ... (an oddly-early first check just one op in, then a 100-op cadence offset by 1) rather than after every clean block of 100 ops.
 
