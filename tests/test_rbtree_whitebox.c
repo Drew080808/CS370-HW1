@@ -200,6 +200,40 @@ static void test_delete_case3_case4_cascade(void) {
     rb_destroy(t);
 }
 
+static void test_delete_case4_direct(void) {
+    rb_node_t *h = make_node("h", RB_BLACK);
+    rb_node_t *m = make_node("m", RB_RED);
+    rb_node_t *l = make_node("l", RB_BLACK);
+    rb_node_t *j = make_node("j", RB_BLACK);
+    j->left = h;
+    h->parent = j;
+    j->right = l;
+    l->parent = j;
+    l->right = m;
+    m->parent = l;
+    rbtree_t *t = make_tree(j, 4);
+    assert(rb_validate(t) == 0);
+
+    /* Deleting "h" leaves x=NIL/x_parent=j with black sibling "l" whose
+     * far-nephew "m" is already red on the first check -- Case 1 and
+     * Case 3 both skip, landing directly in Case 4: l takes j's color,
+     * j and m go black, rotate left at j, loop exits via x = t->root. */
+    assert(rb_delete(t, "h") == 0);
+    assert(rb_size(t) == 3);
+    assert(rb_validate(t) == 0);
+    assert(strcmp(t->root->key, "l") == 0);
+    assert(t->root->color == RB_BLACK);
+    assert(strcmp(t->root->left->key, "j") == 0);
+    assert(t->root->left->color == RB_BLACK);
+    assert(t->root->left->left == NULL);
+    assert(t->root->left->right == NULL);
+    assert(strcmp(t->root->right->key, "m") == 0);
+    assert(t->root->right->color == RB_BLACK);
+    assert(t->root->right->left == NULL);
+    assert(t->root->right->right == NULL);
+    rb_destroy(t);
+}
+
 int main(void) {
     test_validate_rejects_red_root();
     test_validate_rejects_red_red_violation();
@@ -210,6 +244,7 @@ int main(void) {
     test_delete_two_children_root_triggers_fixup();
     test_delete_case1_red_sibling();
     test_delete_case3_case4_cascade();
+    test_delete_case4_direct();
     printf("all whitebox tests passed\n");
     return 0;
 }
