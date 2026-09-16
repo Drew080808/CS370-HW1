@@ -270,6 +270,47 @@ static void test_delete_case4_mirror_direct(void) {
     rb_destroy(tr);
 }
 
+static void test_delete_case1_mirror_cascade(void) {
+    rb_node_t *a = make_node("a", RB_BLACK);
+    rb_node_t *c = make_node("c", RB_BLACK);
+    rb_node_t *b = make_node("b", RB_RED);
+    rb_node_t *f = make_node("f", RB_BLACK);
+    rb_node_t *d = make_node("d", RB_BLACK);
+    d->left = b;
+    b->parent = d;
+    d->right = f;
+    f->parent = d;
+    b->left = a;
+    a->parent = b;
+    b->right = c;
+    c->parent = b;
+    rbtree_t *t = make_tree(d, 5);
+    assert(rb_validate(t) == 0);
+
+    /* Deleting "f" leaves x=NIL/x_parent=d with d->left=b non-NULL, so
+     * fixup takes the mirror branch (w = x_parent->left = b). b is red --
+     * Case 1 mirror rotates right at d (b black, d red, new w becomes c),
+     * then Case 2 mirror fires immediately on c (both of c's children are
+     * NIL/black), recoloring c red and moving the extra black up to d.
+     * The loop then exits because d is red, and the trailing fixup
+     * blackens it. */
+    assert(rb_delete(t, "f") == 0);
+    assert(rb_size(t) == 4);
+    assert(rb_validate(t) == 0);
+    assert(strcmp(t->root->key, "b") == 0);
+    assert(t->root->color == RB_BLACK);
+    assert(strcmp(t->root->left->key, "a") == 0);
+    assert(t->root->left->color == RB_BLACK);
+    assert(t->root->left->left == NULL);
+    assert(t->root->left->right == NULL);
+    assert(strcmp(t->root->right->key, "d") == 0);
+    assert(t->root->right->color == RB_BLACK);
+    assert(t->root->right->right == NULL);
+    assert(t->root->right->left != NULL && strcmp(t->root->right->left->key, "c") == 0);
+    assert(t->root->right->left->color == RB_RED);
+    rb_destroy(t);
+}
+
 int main(void) {
     test_validate_rejects_red_root();
     test_validate_rejects_red_red_violation();
@@ -282,6 +323,7 @@ int main(void) {
     test_delete_case3_case4_cascade();
     test_delete_case4_direct();
     test_delete_case4_mirror_direct();
+    test_delete_case1_mirror_cascade();
     printf("all whitebox tests passed\n");
     return 0;
 }
