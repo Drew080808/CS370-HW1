@@ -83,7 +83,8 @@ Fuzzer must run ≥10^5 random insert/find/delete ops against a reference model,
   tool-output debugging loop, a review finding I triaged. Annotate with what came back and my
   judgment call, not raw transcript dumps.
 - `REFLECTION.md` — where the agent was most/least reliable, one bug it introduced that I
-  caught, and the biggest C surprise coming from Java.
+  caught, and the biggest C surprise coming from Java. STATUS: first two sections drafted;
+  "biggest C surprise coming from Java" is still a TODO -- fill in before submission.
 - Raw Claude Code session transcripts (`.jsonl`) for this project get copied in as-is at
   submission time — work in this project's own dedicated directory so they don't mix with
   unrelated sessions.
