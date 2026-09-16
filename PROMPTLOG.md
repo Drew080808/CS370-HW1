@@ -33,3 +33,10 @@
 **What came back:** The agent agreed immediately, confirmed the exact failure mode I'd named (validates on op-completion-counts 1/101/201 instead of 100/200/300), and proposed `if ((i + 1) % VALIDATE_EVERY == 0)` as the fix without arguing for the original.
 
 **My judgment call:** Straightforward correction, accepted as-is -- `(i + 1) % VALIDATE_EVERY == 0` is what actually reads as "every 100 ops" and avoids validating after a near-empty tree on op 1. Small enough not to warrant a fresh review round; had the agent apply it directly to the file before the first write rather than writing-then-fixing.
+
+## Episode: adversarial review catches memcheck running fewer fuzzer ops than required (review finding triaged)
+**Context:** Per CLAUDE.md's workflow rule (adversarial review from a fresh context before committing a milestone), ran `/code-review` against the M2 fuzzer commit (`4cd4f56`). This was the review step that hadn't been run yet for the M2 milestone.
+
+**What came back:** One finding: `Makefile`'s `memcheck` target invoked the fuzzer binary with only `20000` ops (`./$(FUZZBIN) 20000`), while CLAUDE.md explicitly requires >=10^5 ops under *both* `asan` and `memcheck`. `make test`/`make asan` already ran the full 100000; `memcheck` alone was quietly under-running the fuzzer, likely to keep valgrind's runtime down, but at the cost of violating the spec's stated bar.
+
+**My judgment call:** Legitimate finding, not a false positive -- accepted immediately. Had the agent bump the `memcheck` target to `100000` (matching `test`/`asan`) and re-verify with `make clean && make memcheck`. Confirmed clean: 0 valgrind errors across all three binaries, 66,582/66,582 allocs/frees balanced on the 100000-op fuzzer run. Slower `memcheck` runtime is an acceptable tradeoff for actually meeting the spec's coverage requirement rather than silently falling short of it.
