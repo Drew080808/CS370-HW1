@@ -311,6 +311,43 @@ static void test_delete_case1_mirror_cascade(void) {
     rb_destroy(t);
 }
 
+static void test_delete_case3_mirror_cascade(void) {
+    rb_node_t *h = make_node("h", RB_RED);
+    rb_node_t *g = make_node("g", RB_BLACK);
+    rb_node_t *l = make_node("l", RB_BLACK);
+    rb_node_t *j = make_node("j", RB_BLACK);
+    j->left = g;
+    g->parent = j;
+    j->right = l;
+    l->parent = j;
+    g->right = h;
+    h->parent = g;
+    rbtree_t *t = make_tree(j, 4);
+    assert(rb_validate(t) == 0);
+
+    /* Deleting "l" leaves x=NIL/x_parent=j with j->left=g non-NULL, so
+     * fixup takes the mirror branch (w = x_parent->left = g). g is black
+     * with near-nephew (mirror near-nephew is w->right) "h" red and
+     * far-nephew (w->left, NIL) black -- Case 3 mirror rotates left at g
+     * (h black, g red), then falls through into Case 4 mirror
+     * immediately: h takes j's color, j and g (new far-nephew) go black,
+     * rotate right at j, loop exits via x = t->root. */
+    assert(rb_delete(t, "l") == 0);
+    assert(rb_size(t) == 3);
+    assert(rb_validate(t) == 0);
+    assert(strcmp(t->root->key, "h") == 0);
+    assert(t->root->color == RB_BLACK);
+    assert(strcmp(t->root->left->key, "g") == 0);
+    assert(t->root->left->color == RB_BLACK);
+    assert(t->root->left->left == NULL);
+    assert(t->root->left->right == NULL);
+    assert(strcmp(t->root->right->key, "j") == 0);
+    assert(t->root->right->color == RB_BLACK);
+    assert(t->root->right->left == NULL);
+    assert(t->root->right->right == NULL);
+    rb_destroy(t);
+}
+
 int main(void) {
     test_validate_rejects_red_root();
     test_validate_rejects_red_red_violation();
@@ -324,6 +361,7 @@ int main(void) {
     test_delete_case4_direct();
     test_delete_case4_mirror_direct();
     test_delete_case1_mirror_cascade();
+    test_delete_case3_mirror_cascade();
     printf("all whitebox tests passed\n");
     return 0;
 }
