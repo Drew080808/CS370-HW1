@@ -128,6 +128,43 @@ static void test_delete_two_children_root_triggers_fixup(void) {
     rb_destroy(t);
 }
 
+static void test_delete_case1_red_sibling(void) {
+    rb_node_t *b = make_node("b", RB_BLACK);
+    rb_node_t *e = make_node("e", RB_BLACK);
+    rb_node_t *g = make_node("g", RB_BLACK);
+    rb_node_t *f = make_node("f", RB_RED);
+    rb_node_t *d = make_node("d", RB_BLACK);
+    d->left = b;
+    b->parent = d;
+    d->right = f;
+    f->parent = d;
+    f->left = e;
+    e->parent = f;
+    f->right = g;
+    g->parent = f;
+    rbtree_t *t = make_tree(d, 5);
+    assert(rb_validate(t) == 0);
+
+    /* Deleting "b" leaves x=NIL/x_parent=d with a red sibling "f" -- case 1
+     * rotates left at d (f black, d red, new sibling becomes e), then
+     * case 2 fires immediately on e (both of e's children are NIL/black),
+     * recoloring e red and moving the "extra black" up to d. The loop
+     * then exits because d is red, and the trailing fixup blackens it. */
+    assert(rb_delete(t, "b") == 0);
+    assert(rb_size(t) == 4);
+    assert(rb_validate(t) == 0);
+    assert(strcmp(t->root->key, "f") == 0);
+    assert(t->root->color == RB_BLACK);
+    assert(strcmp(t->root->left->key, "d") == 0);
+    assert(t->root->left->color == RB_BLACK);
+    assert(t->root->left->left == NULL);
+    assert(t->root->left->right != NULL && strcmp(t->root->left->right->key, "e") == 0);
+    assert(t->root->left->right->color == RB_RED);
+    assert(strcmp(t->root->right->key, "g") == 0);
+    assert(t->root->right->color == RB_BLACK);
+    rb_destroy(t);
+}
+
 int main(void) {
     test_validate_rejects_red_root();
     test_validate_rejects_red_red_violation();
@@ -136,6 +173,7 @@ int main(void) {
     test_validate_rejects_size_mismatch();
     test_validate_accepts_hand_built_valid_tree();
     test_delete_two_children_root_triggers_fixup();
+    test_delete_case1_red_sibling();
     printf("all whitebox tests passed\n");
     return 0;
 }
