@@ -33,7 +33,7 @@ memcheck: all
 	valgrind --leak-check=full --show-leak-kinds=all \
 		--error-exitcode=1 ./$(BIN)
 	valgrind --leak-check=full --show-leak-kinds=all \
-		--error-exitcode=1 ./$(FUZZBIN) 20000
+		--error-exitcode=1 ./$(FUZZBIN) 100000
 	valgrind --leak-check=full --show-leak-kinds=all \
 		--error-exitcode=1 ./$(WBBIN)
 
